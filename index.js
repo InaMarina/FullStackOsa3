@@ -3,6 +3,7 @@ const app = express();
 const cors = require("cors");
 var morgan = require("morgan");
 
+app.use(express.static("build"));
 app.use(express.json());
 app.use(cors());
 app.use(morgan("tiny"));
@@ -39,11 +40,6 @@ const generateId = () => {
   const maxId = persons.length > 0 ? Math.max(...persons.map((n) => n.id)) : 0;
   return maxId + 1;
 };
-
-//Juuripolku palauttaa otsikon
-app.get("/", (req, res) => {
-  res.send("<h1>Puhelinluettelo</h1>");
-});
 
 //Persons palauttaa listan
 app.get("/api/persons", (req, res) => {
