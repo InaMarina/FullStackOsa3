@@ -16,22 +16,22 @@ let persons = [
   {
     name: "Arto Hellas",
     number: "040-123456",
-    id: "1",
+    id: 1,
   },
   {
     name: "Ada Lovelace",
     number: "39-44-5323523",
-    id: "2",
+    id: 2,
   },
   {
     name: "Dan Abramov",
     number: "12-43-234345",
-    id: "3",
+    id: 3,
   },
   {
     name: "Mary Poppendieck",
     number: "39-23-6423122",
-    id: "4",
+    id: 4,
   },
 ];
 
@@ -55,7 +55,7 @@ app.get("/info", (req, res) => {
 
 //Palauttaa tietyn id:n personin
 app.get("/api/persons/:id", (req, res) => {
-  const id = req.params.id;
+  const id = Number(req.params.id);
   const person = persons.find((person) => person.id === id);
 
   //Tarkistaa että on id jolla on contenttia
@@ -99,7 +99,7 @@ app.post("/api/persons", (req, res) => {
       error: "name must be unique",
     });
   }
-
+  //Jos ei ole:
   const person = {
     name: body.name,
     number: body.number,
@@ -107,7 +107,7 @@ app.post("/api/persons", (req, res) => {
   };
 
   //lisää listalle
-  persons.concat(person);
+  persons = persons.concat(person);
 
   res.json(person);
 });
