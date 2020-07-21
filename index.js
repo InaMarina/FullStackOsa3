@@ -1,10 +1,14 @@
+require("dotenv").config();
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const Person = require("./models/person");
 var morgan = require("morgan");
+const { response } = require("express");
 
 app.use(express.static("build"));
 app.use(express.json());
+
 app.use(cors());
 app.use(morgan("tiny"));
 morgan.token("body", function (req, res) {
@@ -12,104 +16,96 @@ morgan.token("body", function (req, res) {
 });
 app.use(morgan(":method :url :status :response-time ms - :body"));
 
-let persons = [
-  {
-    name: "Arto Hellas",
-    number: "040-123456",
-    id: 1,
-  },
-  {
-    name: "Ada Lovelace",
-    number: "39-44-5323523",
-    id: 2,
-  },
-  {
-    name: "Dan Abramov",
-    number: "12-43-234345",
-    id: 3,
-  },
-  {
-    name: "Mary Poppendieck",
-    number: "39-23-6423122",
-    id: 4,
-  },
-];
-
-//Id:n generoiva funktio
+//Id:n generoiva funktio (ei tarvita)
 const generateId = () => {
   const maxId = persons.length > 0 ? Math.max(...persons.map((n) => n.id)) : 0;
   return maxId + 1;
 };
 
-//Persons palauttaa listan
+//Persons palauttaa personit kannasta (TOIMII)
 app.get("/api/persons", (req, res) => {
-  res.json(persons);
+  Person.find({}).then((persons) => {
+    res.json(persons);
+  });
 });
 
-//Info palauttaa listalla olevien määrän ja Daten
+//Info palauttaa kannassa olevien personien ja Daten (TOIMII)
 app.get("/info", (req, res) => {
-  const amount = persons.length;
-  const date = new Date();
-  res.send("<p>phonebook has info for " + amount + " persons</p>" + date);
+  const number = Person.count({}, function (err, count) {
+    const date = new Date();
+    res.send("<p>Phonebook has info for " + count + " persons</p>" + date);
+  });
 });
 
-//Palauttaa tietyn id:n personin
-app.get("/api/persons/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const person = persons.find((person) => person.id === id);
-
-  //Tarkistaa että on id jolla on contenttia
-  if (person) {
-    res.json(person);
-  } else {
-    res.status(404).end();
-  }
+//Palauttaa tietyn id:n personin (TOIMII)
+app.get("/api/persons/:id", (req, res, next) => {
+  Person.findById(req.params.id)
+    .then((person) => {
+      //Tarkistaa että on id jolla on contenttia
+      if (person) {
+        res.json(person);
+      } else {
+        res.status(404).end();
+      }
+    })
+    .catch((error) => next(error));
 });
 
 //poistaa tietyn personin id:n perusteella. Testattu
-app.delete("/api/persons/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const person = persons.find((person) => person.id === id);
-
-  persons = persons.filter((person) => person.id !== id);
-  res.status(204).end();
+app.delete("/api/persons/:id", (req, res, next) => {
+  Person.findByIdAndRemove(req.params.id)
+    .then((result) => {
+      if (result) {
+        res.status(204).end();
+      } else {
+        res.status(404).end();
+      }
+    })
+    .catch((error) => next(error));
 });
 
-//lisää personin
+//lisää person tietokantaan (TOIMII)
 app.post("/api/persons", (req, res) => {
   const body = req.body;
 
-  //Jos name on tyhjä
-  if (!body.name) {
-    return res.status(400).json({
-      error: "name cant be empty",
-    });
+  if (body.name === undefined) {
+    return res.status(400).json({ error: "name missing" });
+  }
+  if (body.number === undefined) {
+    return res.status(400).json({ error: "number missing" });
   }
 
-  //JOs number on tyhjä
-  if (!body.number) {
-    return res.status(400).json({
-      error: "number cant be empty",
-    });
-  }
-
-  //Jos name on jo listalla
-  if (persons.filter((person) => person.name === body.name).length > 0) {
-    return res.status(400).json({
-      error: "name must be unique",
-    });
-  }
-  //Jos ei ole:
-  const person = {
+  const person = new Person({
     name: body.name,
     number: body.number,
-    id: generateId(),
+  });
+
+  person.save().then((savedPerson) => {
+    res.json(savedPerson);
+  });
+});
+
+app.put("/api/persons/:id", (req, res, next) => {
+  const body = req.body;
+
+  const person = {
+    number: body.number,
   };
 
-  //lisää listalle
-  persons = persons.concat(person);
-
-  res.json(person);
+  Person.findByIdAndUpdate(req.params.id, person, {
+    new: true,
+    runValidators: true,
+    context: "query",
+  })
+    .then((updatedEntry) => {
+      if (updatedEntry === null) {
+        return res
+          .status(404)
+          .send({ error: `${body.name} was already deleted from server` });
+      }
+      res.json(updatedEntry);
+    })
+    .catch((error) => next(error));
 });
 
 //Käsittelemätön virhetilanne
@@ -119,7 +115,23 @@ const unknownEndpoint = (req, res) => {
 
 app.use(unknownEndpoint);
 
-const PORT = process.env.PORT || 3001;
+//Errorien händlääminen
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message);
+
+  if (error.name === "CastError" && error.kind == "ObjectId") {
+    return response.status(400).send({ error: "malformatted id" });
+  } else if (error.name === "ValidationError") {
+    return response.status(400).json({ error: error.message });
+  }
+
+  next(error);
+};
+
+app.use(errorHandler);
+
+const PORT = process.env.PORT;
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
