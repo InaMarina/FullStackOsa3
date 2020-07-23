@@ -51,7 +51,7 @@ app.get("/api/persons/:id", (req, res, next) => {
     .catch((error) => next(error));
 });
 
-//poistaa tietyn personin id:n perusteella. Testattu
+//poistaa tietyn personin id:n perusteella. (TOIMII)
 app.delete("/api/persons/:id", (req, res, next) => {
   Person.findByIdAndRemove(req.params.id)
     .then((result) => {
@@ -80,11 +80,16 @@ app.post("/api/persons", (req, res) => {
     number: body.number,
   });
 
-  person.save().then((savedPerson) => {
-    res.json(savedPerson);
-  });
+  person
+    .save()
+    .then((savedPerson) => {
+      res.json(savedPerson);
+    })
+
+    .catch((error) => next(error));
 });
 
+//Päivittää puhelinnumeron (TOIMII)
 app.put("/api/persons/:id", (req, res, next) => {
   const body = req.body;
 
